@@ -17,7 +17,6 @@ import {
   CameraOutlined,
   ScanOutlined,
   LoadingOutlined,
-  RightCircleOutlined,
 } from "@ant-design/icons";
 import type { UploadProps } from "antd";
 import * as faceapi from "face-api.js";
@@ -35,6 +34,7 @@ const translations = {
     uploadBtn: "Tải ảnh lên",
     openCamera: "Mở Camera",
     closeCamera: "Đóng Camera",
+    clearBtn: "Xóa ảnh / Tắt Camera",
     awaiting: "Nhấn vào đây để tải ảnh hoặc mở camera",
     analyzeBtn: "Đoán tuổi",
     analyzingBtn: "Đang phân tích...",
@@ -47,7 +47,8 @@ const translations = {
     errNoFace:
       "Không phát hiện thấy khuôn mặt. Vui lòng đảm bảo bạn ở rõ trong khung hình.",
     errAnalyze: "Lỗi khi phân tích ảnh.",
-    errCamera: "Không thể truy cập camera.",
+    errCamera:
+      "Không thể truy cập camera. Vui lòng cấp quyền hoặc thử lại trên trình duyệt mặc định.",
     errModelFail:
       "Không thể tải các mô hình nhận diện. Đảm bảo chúng ở trong thư mục public/models.",
     guessingText: "Đang đoán tuổi...",
@@ -60,6 +61,7 @@ const translations = {
     uploadBtn: "Upload Photo",
     openCamera: "Open Camera",
     closeCamera: "Close Camera",
+    clearBtn: "Clear Media",
     awaiting: "Click here to upload or open camera",
     analyzeBtn: "Analyze Age",
     analyzingBtn: "Analyzing Features...",
@@ -71,7 +73,8 @@ const translations = {
     errNoInput: "Please upload an image or start the camera first.",
     errNoFace: "No face detected. Please ensure you are clearly in the frame.",
     errAnalyze: "Error analyzing image.",
-    errCamera: "Unable to access camera.",
+    errCamera:
+      "Unable to access camera. Please grant permissions or try a default browser.",
     errModelFail:
       "Failed to load detection models. Ensure they are in the public/models directory.",
     guessingText: "Guessing age...",
@@ -93,8 +96,8 @@ const App: React.FC = () => {
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
-  // State mới để ẩn/hiện 2 nút
   const [showOptions, setShowOptions] = useState<boolean>(false);
+  const [hasAnalyzed, setHasAnalyzed] = useState<boolean>(false);
 
   const imageRef = useRef<HTMLImageElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -130,6 +133,8 @@ const App: React.FC = () => {
         setImageUrl(e.target?.result as string);
         setDetectedAge(null);
         stopCamera();
+        setShowOptions(false);
+        setHasAnalyzed(false);
       };
       reader.readAsDataURL(file);
       return false;
@@ -138,17 +143,35 @@ const App: React.FC = () => {
   };
 
   const startCamera = async () => {
+    // Kiểm tra xem trình duyệt có hỗ trợ mediaDevices không (thường bị chặn trên in-app browser)
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      message.error(t.errCamera);
+      return;
+    }
+
     setImageUrl(null);
     setDetectedAge(null);
     setIsCameraActive(true);
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      // Tối ưu hóa Constraints cho Mobile: Gọi camera trước và giới hạn độ phân giải
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: { ideal: 720 },
+          height: { ideal: 1280 },
+        },
+      });
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
+      setShowOptions(false);
+      setHasAnalyzed(false);
     } catch (err) {
       message.error(t.errCamera);
       setIsCameraActive(false);
+      console.error("Camera Error:", err);
     }
   };
 
@@ -159,6 +182,13 @@ const App: React.FC = () => {
       videoRef.current.srcObject = null;
     }
     setIsCameraActive(false);
+  };
+
+  const clearMedia = () => {
+    setImageUrl(null);
+    stopCamera();
+    setHasAnalyzed(false);
+    setShowOptions(false);
   };
 
   const detectAge = async () => {
@@ -195,6 +225,7 @@ const App: React.FC = () => {
       if (detection) {
         setDetectedAge(Math.round(detection.age));
         setIsModalOpen(true);
+        setHasAnalyzed(true);
       } else {
         message.warning(t.errNoFace);
       }
@@ -204,6 +235,14 @@ const App: React.FC = () => {
     } finally {
       setAnalyzing(false);
     }
+  };
+
+  const closeResultModal = () => {
+    setIsModalOpen(false);
+    setImageUrl(null);
+    stopCamera();
+    setHasAnalyzed(false);
+    setShowOptions(false);
   };
 
   useEffect(() => {
@@ -289,48 +328,33 @@ const App: React.FC = () => {
                   size="large"
                   style={{ width: "100%" }}
                 >
-                  {/* Chỉ hiển thị 2 nút này khi showOptions = true */}
-                  {showOptions && (
-                    <Row justify="center" gutter={16}>
-                      <Col>
-                        <Upload {...uploadProps} accept="image/*">
-                          <Button
-                            size="large"
-                            shape="round"
-                            icon={<UploadOutlined />}
-                          >
-                            {t.uploadBtn}
-                          </Button>
-                        </Upload>
-                      </Col>
-                      <Col>
-                        <Button
-                          size="large"
-                          shape="round"
-                          type={isCameraActive ? "default" : "primary"}
-                          ghost={!isCameraActive}
-                          danger={isCameraActive}
-                          icon={<CameraOutlined />}
-                          onClick={isCameraActive ? stopCamera : startCamera}
-                        >
-                          {isCameraActive ? t.closeCamera : t.openCamera}
-                        </Button>
-                      </Col>
-                    </Row>
-                  )}
-
                   <Spin spinning={analyzing} tip={t.guessingText} size="large">
                     <div
                       className="preview-container"
-                      onClick={() => !showOptions && setShowOptions(true)}
-                      style={{ cursor: !showOptions ? "pointer" : "default" }}
+                      onClick={() => {
+                        const canClick =
+                          !showOptions &&
+                          (hasAnalyzed || (!imageUrl && !isCameraActive));
+                        if (canClick) {
+                          setShowOptions(true);
+                        }
+                      }}
+                      style={{
+                        cursor:
+                          !showOptions &&
+                          (hasAnalyzed || (!imageUrl && !isCameraActive))
+                            ? "pointer"
+                            : "default",
+                      }}
                     >
+                      {/* Video tag optimized for Mobile/iOS */}
                       {isCameraActive && (
                         <video
                           ref={videoRef}
                           autoPlay
                           muted
                           playsInline
+                          controls={false}
                           className="media-element mirror-video"
                         />
                       )}
@@ -342,29 +366,75 @@ const App: React.FC = () => {
                           className="media-element"
                         />
                       )}
+
                       {!imageUrl && !isCameraActive && (
-                        <div className="placeholder-text">
-                          {/* Thay đổi icon nếu chưa mở option để gợi ý click */}
-                          {!showOptions ? (
-                            <RightCircleOutlined
-                              style={{
-                                fontSize: 48,
-                                marginBottom: 12,
-                                opacity: 0.5,
-                                display: "block",
-                              }}
-                            />
-                          ) : (
-                            <ScanOutlined
-                              style={{
-                                fontSize: 48,
-                                marginBottom: 12,
-                                opacity: 0.5,
-                                display: "block",
-                              }}
-                            />
-                          )}
-                          {t.awaiting}
+                        <Space wrap style={{ justifyContent: "center" }}>
+                          <Upload
+                            {...uploadProps}
+                            accept="image/*"
+                            showUploadList={false}
+                          >
+                            <Button
+                              size="large"
+                              shape="round"
+                              type="primary"
+                              icon={<UploadOutlined />}
+                            >
+                              {t.uploadBtn}
+                            </Button>
+                          </Upload>
+                          <Button
+                            size="large"
+                            shape="round"
+                            type="primary"
+                            ghost
+                            icon={<CameraOutlined />}
+                            onClick={startCamera}
+                          >
+                            {t.openCamera}
+                          </Button>
+                        </Space>
+                      )}
+
+                      {showOptions && (imageUrl || isCameraActive) && (
+                        <div className="options-overlay">
+                          <Space
+                            direction="vertical"
+                            align="center"
+                            size="middle"
+                          >
+                            <Space wrap style={{ justifyContent: "center" }}>
+                              <Upload
+                                {...uploadProps}
+                                accept="image/*"
+                                showUploadList={false}
+                              >
+                                <Button
+                                  size="large"
+                                  shape="round"
+                                  icon={<UploadOutlined />}
+                                >
+                                  {t.uploadBtn}
+                                </Button>
+                              </Upload>
+                              <Button
+                                size="large"
+                                shape="round"
+                                type={isCameraActive ? "default" : "primary"}
+                                ghost={!isCameraActive}
+                                danger={isCameraActive}
+                                icon={<CameraOutlined />}
+                                onClick={
+                                  isCameraActive ? stopCamera : startCamera
+                                }
+                              >
+                                {isCameraActive ? t.closeCamera : t.openCamera}
+                              </Button>
+                            </Space>
+                            <Button danger shape="round" onClick={clearMedia}>
+                              {t.clearBtn}
+                            </Button>
+                          </Space>
                         </div>
                       )}
                     </div>
@@ -397,7 +467,7 @@ const App: React.FC = () => {
 
         <Modal
           open={isModalOpen}
-          onCancel={() => setIsModalOpen(false)}
+          onCancel={closeResultModal}
           footer={null}
           centered
           className="transparent-modal"
@@ -416,7 +486,7 @@ const App: React.FC = () => {
             </Title>
             <Button
               shape="round"
-              onClick={() => setIsModalOpen(false)}
+              onClick={closeResultModal}
               style={{ marginTop: 24, fontWeight: "bold" }}
             >
               {t.awesomeBtn}
