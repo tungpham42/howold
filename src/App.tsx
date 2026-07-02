@@ -49,6 +49,7 @@ const translations = {
     errCamera: "Không thể truy cập camera.",
     errModelFail:
       "Không thể tải các mô hình nhận diện. Đảm bảo chúng ở trong thư mục public/models.",
+    guessingText: "Đang đoán tuổi...", // Add Vietnamese translation here
   },
   en: {
     title: "How Old Do I Look?",
@@ -72,6 +73,7 @@ const translations = {
     errCamera: "Unable to access camera.",
     errModelFail:
       "Failed to load detection models. Ensure they are in the public/models directory.",
+    guessingText: "Guessing age...", // Add English translation here
   },
 };
 
@@ -181,9 +183,13 @@ const App: React.FC = () => {
         return;
       }
 
-      const detection = await faceapi
-        .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions())
-        .withAgeAndGender();
+      // Run both the AI detection and a 2.5-second timer concurrently
+      const [detection] = await Promise.all([
+        faceapi
+          .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions())
+          .withAgeAndGender(),
+        new Promise((resolve) => setTimeout(resolve, 2500)), // 2500ms artificial delay
+      ]);
 
       if (detection) {
         setDetectedAge(Math.round(detection.age));
@@ -310,38 +316,41 @@ const App: React.FC = () => {
                     </Col>
                   </Row>
 
-                  <div className="preview-container">
-                    {isCameraActive && (
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        muted
-                        playsInline
-                        className="media-element mirror-video" /* Added mirror-video here */
-                      />
-                    )}
-                    {imageUrl && !isCameraActive && (
-                      <img
-                        ref={imageRef}
-                        src={imageUrl}
-                        alt="Target for analysis"
-                        className="media-element"
-                      />
-                    )}
-                    {!imageUrl && !isCameraActive && (
-                      <div className="placeholder-text">
-                        <ScanOutlined
-                          style={{
-                            fontSize: 48,
-                            marginBottom: 12,
-                            opacity: 0.5,
-                            display: "block",
-                          }}
+                  {/* Wrap the preview-container with Spin to display loading text */}
+                  <Spin spinning={analyzing} tip={t.guessingText} size="large">
+                    <div className="preview-container">
+                      {isCameraActive && (
+                        <video
+                          ref={videoRef}
+                          autoPlay
+                          muted
+                          playsInline
+                          className="media-element mirror-video" /* Added mirror-video here */
                         />
-                        {t.awaiting}
-                      </div>
-                    )}
-                  </div>
+                      )}
+                      {imageUrl && !isCameraActive && (
+                        <img
+                          ref={imageRef}
+                          src={imageUrl}
+                          alt="Target for analysis"
+                          className="media-element"
+                        />
+                      )}
+                      {!imageUrl && !isCameraActive && (
+                        <div className="placeholder-text">
+                          <ScanOutlined
+                            style={{
+                              fontSize: 48,
+                              marginBottom: 12,
+                              opacity: 0.5,
+                              display: "block",
+                            }}
+                          />
+                          {t.awaiting}
+                        </div>
+                      )}
+                    </div>
+                  </Spin>
 
                   <Row justify="center">
                     <Button
