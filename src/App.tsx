@@ -17,6 +17,7 @@ import {
   CameraOutlined,
   ScanOutlined,
   LoadingOutlined,
+  RightCircleOutlined,
 } from "@ant-design/icons";
 import type { UploadProps } from "antd";
 import * as faceapi from "face-api.js";
@@ -34,7 +35,7 @@ const translations = {
     uploadBtn: "Tải ảnh lên",
     openCamera: "Mở Camera",
     closeCamera: "Đóng Camera",
-    awaiting: "Đang chờ ảnh của bạn",
+    awaiting: "Nhấn vào đây để tải ảnh hoặc mở camera",
     analyzeBtn: "Đoán tuổi",
     analyzingBtn: "Đang phân tích...",
     modalTitle: "Phân tích hoàn tất",
@@ -49,7 +50,7 @@ const translations = {
     errCamera: "Không thể truy cập camera.",
     errModelFail:
       "Không thể tải các mô hình nhận diện. Đảm bảo chúng ở trong thư mục public/models.",
-    guessingText: "Đang đoán tuổi...", // Add Vietnamese translation here
+    guessingText: "Đang đoán tuổi...",
   },
   en: {
     title: "How Old Do I Look?",
@@ -59,7 +60,7 @@ const translations = {
     uploadBtn: "Upload Photo",
     openCamera: "Open Camera",
     closeCamera: "Close Camera",
-    awaiting: "Awaiting your portrait",
+    awaiting: "Click here to upload or open camera",
     analyzeBtn: "Analyze Age",
     analyzingBtn: "Analyzing Features...",
     modalTitle: "Analysis Complete",
@@ -73,14 +74,13 @@ const translations = {
     errCamera: "Unable to access camera.",
     errModelFail:
       "Failed to load detection models. Ensure they are in the public/models directory.",
-    guessingText: "Guessing age...", // Add English translation here
+    guessingText: "Guessing age...",
   },
 };
 
 type Language = "vi" | "en";
 
 const App: React.FC = () => {
-  // Initialize from LocalStorage, default to "vi" if not found
   const [lang, setLang] = useState<Language>(() => {
     const savedLang = localStorage.getItem("preferredLang");
     return savedLang === "en" || savedLang === "vi" ? savedLang : "vi";
@@ -93,11 +93,13 @@ const App: React.FC = () => {
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
+  // State mới để ẩn/hiện 2 nút
+  const [showOptions, setShowOptions] = useState<boolean>(false);
+
   const imageRef = useRef<HTMLImageElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const t = translations[lang];
 
-  // Handler to update state AND local storage
   const handleLanguageToggle = (selectedLang: Language) => {
     setLang(selectedLang);
     localStorage.setItem("preferredLang", selectedLang);
@@ -183,12 +185,11 @@ const App: React.FC = () => {
         return;
       }
 
-      // Run both the AI detection and a 2.5-second timer concurrently
       const [detection] = await Promise.all([
         faceapi
           .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions())
           .withAgeAndGender(),
-        new Promise((resolve) => setTimeout(resolve, 2500)), // 2500ms artificial delay
+        new Promise((resolve) => setTimeout(resolve, 2500)),
       ]);
 
       if (detection) {
@@ -233,7 +234,6 @@ const App: React.FC = () => {
         <Row justify="center" style={{ width: "100%" }}>
           <Col xs={24} sm={22} md={18} lg={14} xl={10}>
             <Card className="glass-card" bordered={false}>
-              {/* Premium Language Switcher Pill */}
               <div className="fancy-switcher-wrapper">
                 <div className={`lang-pill ${lang}`}>
                   <div className="slider-bg" />
@@ -289,43 +289,49 @@ const App: React.FC = () => {
                   size="large"
                   style={{ width: "100%" }}
                 >
-                  <Row justify="center" gutter={16}>
-                    <Col>
-                      <Upload {...uploadProps} accept="image/*">
+                  {/* Chỉ hiển thị 2 nút này khi showOptions = true */}
+                  {showOptions && (
+                    <Row justify="center" gutter={16}>
+                      <Col>
+                        <Upload {...uploadProps} accept="image/*">
+                          <Button
+                            size="large"
+                            shape="round"
+                            icon={<UploadOutlined />}
+                          >
+                            {t.uploadBtn}
+                          </Button>
+                        </Upload>
+                      </Col>
+                      <Col>
                         <Button
                           size="large"
                           shape="round"
-                          icon={<UploadOutlined />}
+                          type={isCameraActive ? "default" : "primary"}
+                          ghost={!isCameraActive}
+                          danger={isCameraActive}
+                          icon={<CameraOutlined />}
+                          onClick={isCameraActive ? stopCamera : startCamera}
                         >
-                          {t.uploadBtn}
+                          {isCameraActive ? t.closeCamera : t.openCamera}
                         </Button>
-                      </Upload>
-                    </Col>
-                    <Col>
-                      <Button
-                        size="large"
-                        shape="round"
-                        type={isCameraActive ? "default" : "primary"}
-                        ghost={!isCameraActive}
-                        danger={isCameraActive}
-                        icon={<CameraOutlined />}
-                        onClick={isCameraActive ? stopCamera : startCamera}
-                      >
-                        {isCameraActive ? t.closeCamera : t.openCamera}
-                      </Button>
-                    </Col>
-                  </Row>
+                      </Col>
+                    </Row>
+                  )}
 
-                  {/* Wrap the preview-container with Spin to display loading text */}
                   <Spin spinning={analyzing} tip={t.guessingText} size="large">
-                    <div className="preview-container">
+                    <div
+                      className="preview-container"
+                      onClick={() => !showOptions && setShowOptions(true)}
+                      style={{ cursor: !showOptions ? "pointer" : "default" }}
+                    >
                       {isCameraActive && (
                         <video
                           ref={videoRef}
                           autoPlay
                           muted
                           playsInline
-                          className="media-element mirror-video" /* Added mirror-video here */
+                          className="media-element mirror-video"
                         />
                       )}
                       {imageUrl && !isCameraActive && (
@@ -338,14 +344,26 @@ const App: React.FC = () => {
                       )}
                       {!imageUrl && !isCameraActive && (
                         <div className="placeholder-text">
-                          <ScanOutlined
-                            style={{
-                              fontSize: 48,
-                              marginBottom: 12,
-                              opacity: 0.5,
-                              display: "block",
-                            }}
-                          />
+                          {/* Thay đổi icon nếu chưa mở option để gợi ý click */}
+                          {!showOptions ? (
+                            <RightCircleOutlined
+                              style={{
+                                fontSize: 48,
+                                marginBottom: 12,
+                                opacity: 0.5,
+                                display: "block",
+                              }}
+                            />
+                          ) : (
+                            <ScanOutlined
+                              style={{
+                                fontSize: 48,
+                                marginBottom: 12,
+                                opacity: 0.5,
+                                display: "block",
+                              }}
+                            />
+                          )}
                           {t.awaiting}
                         </div>
                       )}
@@ -377,7 +395,6 @@ const App: React.FC = () => {
           </Col>
         </Row>
 
-        {/* Modal for Results */}
         <Modal
           open={isModalOpen}
           onCancel={() => setIsModalOpen(false)}
