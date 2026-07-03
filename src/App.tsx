@@ -143,7 +143,6 @@ const App: React.FC = () => {
   };
 
   const startCamera = async () => {
-    // Kiểm tra xem trình duyệt có hỗ trợ mediaDevices không (thường bị chặn trên in-app browser)
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       message.error(t.errCamera);
       return;
@@ -154,7 +153,6 @@ const App: React.FC = () => {
     setIsCameraActive(true);
 
     try {
-      // Tối ưu hóa Constraints cho Mobile: Gọi camera trước và giới hạn độ phân giải
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "user",
@@ -191,6 +189,28 @@ const App: React.FC = () => {
     setShowOptions(false);
   };
 
+  // --- NEW: TTS Implementation ---
+  const speakResult = async (age: number) => {
+    const textToSpeak = `${t.modalResult} ${age} ${t.modalSuffix}`;
+    try {
+      const response = await fetch(
+        `https://googlespeak.netlify.app/api/tts?text=${encodeURIComponent(
+          textToSpeak,
+        )}&lang=${lang}`,
+      );
+      const data = await response.json();
+
+      if (data.audioContent) {
+        // Use HTML Audio constructor to play back the base64 content
+        const audio = new Audio(data.audioContent);
+        await audio.play();
+      }
+    } catch (error) {
+      console.error("Error playing TTS audio:", error);
+    }
+  };
+  // -------------------------------
+
   const detectAge = async () => {
     if (!modelsLoaded) {
       message.warning(t.errLoadModels);
@@ -223,9 +243,13 @@ const App: React.FC = () => {
       ]);
 
       if (detection) {
-        setDetectedAge(Math.round(detection.age));
+        const roundedAge = Math.round(detection.age);
+        setDetectedAge(roundedAge);
         setIsModalOpen(true);
         setHasAnalyzed(true);
+
+        // --- NEW: Trigger speech output upon successful detection ---
+        speakResult(roundedAge);
       } else {
         message.warning(t.errNoFace);
       }
