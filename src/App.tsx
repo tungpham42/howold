@@ -232,6 +232,7 @@ const App: React.FC = () => {
       if (!input) {
         message.warning(t.errNoInput);
         setAnalyzing(false);
+        clearMedia();
         return;
       }
 
@@ -252,6 +253,7 @@ const App: React.FC = () => {
         speakResult(roundedAge);
       } else {
         message.warning(t.errNoFace);
+        clearMedia();
       }
     } catch (error) {
       message.error(t.errAnalyze);
