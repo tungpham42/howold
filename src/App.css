@@ -230,3 +230,27 @@ body {
 .lang-btn:hover .flag-icon {
   transform: scale(1.1);
 }
+
+/* --- Privacy Modal Redesign --- */
+
+.privacy-modal {
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 24px !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.15) !important;
+  padding: 6px !important;
+}
+
+.privacy-modal .ant-modal-header {
+  background: transparent !important;
+  border-bottom: none !important;
+  margin-bottom: 8px;
+}
+
+.privacy-modal .ant-modal-footer {
+  border-top: none !important;
+  margin-top: 24px !important;
+  text-align: right;
+}

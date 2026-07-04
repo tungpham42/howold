@@ -52,6 +52,13 @@ const translations = {
     errModelFail:
       "Không thể tải các mô hình nhận diện. Đảm bảo chúng ở trong thư mục public/models.",
     guessingText: "Đang đoán tuổi...",
+    privacyTitle: "Quyền riêng tư & Dữ liệu",
+    privacyDesc:
+      "Ứng dụng này cần sử dụng camera hoặc ảnh tải lên của bạn để phân tích khuôn mặt. Tất cả quá trình xử lý (AI) đều diễn ra trực tiếp trên trình duyệt của thiết bị. Chúng tôi KHÔNG lưu trữ, KHÔNG thu thập và KHÔNG gửi bất kỳ hình ảnh nào của bạn lên máy chủ.",
+    acceptBtn: "Tôi đồng ý",
+    declineBtn: "Từ chối",
+    privacyRequired:
+      "Bạn cần đồng ý chính sách bảo mật để sử dụng tính năng này.",
   },
   en: {
     title: "How Old Do I Look?",
@@ -78,6 +85,12 @@ const translations = {
     errModelFail:
       "Failed to load detection models. Ensure they are in the public/models directory.",
     guessingText: "Guessing age...",
+    privacyTitle: "Data & Privacy Policy",
+    privacyDesc:
+      "This app requires access to your camera or uploaded photos for facial analysis. All AI processing happens locally on your device's browser. We DO NOT store, collect, or send any of your images to any servers.",
+    acceptBtn: "I Accept",
+    declineBtn: "Decline",
+    privacyRequired: "You must accept the privacy policy to use this app.",
   },
 };
 
@@ -99,6 +112,11 @@ const App: React.FC = () => {
   const [showOptions, setShowOptions] = useState<boolean>(false);
   const [hasAnalyzed, setHasAnalyzed] = useState<boolean>(false);
 
+  // --- NEW: State cho Privacy Modal ---
+  const [showPrivacyModal, setShowPrivacyModal] = useState<boolean>(() => {
+    return sessionStorage.getItem("privacyAccepted") !== "true";
+  });
+
   const imageRef = useRef<HTMLImageElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const t = translations[lang];
@@ -106,6 +124,15 @@ const App: React.FC = () => {
   const handleLanguageToggle = (selectedLang: Language) => {
     setLang(selectedLang);
     localStorage.setItem("preferredLang", selectedLang);
+  };
+
+  const handleAcceptPrivacy = () => {
+    sessionStorage.setItem("privacyAccepted", "true");
+    setShowPrivacyModal(false);
+  };
+
+  const handleDeclinePrivacy = () => {
+    message.warning(t.privacyRequired);
   };
 
   useEffect(() => {
@@ -189,7 +216,7 @@ const App: React.FC = () => {
     setShowOptions(false);
   };
 
-  // --- NEW: TTS Implementation ---
+  // --- TTS Implementation ---
   const speakResult = async (age: number) => {
     const textToSpeak = `${t.modalResult} ${age} ${t.modalSuffix}`;
     try {
@@ -209,7 +236,6 @@ const App: React.FC = () => {
       console.error("Error playing TTS audio:", error);
     }
   };
-  // -------------------------------
 
   const detectAge = async () => {
     if (!modelsLoaded) {
@@ -248,8 +274,6 @@ const App: React.FC = () => {
         setDetectedAge(roundedAge);
         setIsModalOpen(true);
         setHasAnalyzed(true);
-
-        // --- NEW: Trigger speech output upon successful detection ---
         speakResult(roundedAge);
       } else {
         message.warning(t.errNoFace);
@@ -491,6 +515,7 @@ const App: React.FC = () => {
           </Col>
         </Row>
 
+        {/* Modal Kết quả */}
         <Modal
           open={isModalOpen}
           onCancel={closeResultModal}
@@ -518,6 +543,41 @@ const App: React.FC = () => {
               {t.awesomeBtn}
             </Button>
           </div>
+        </Modal>
+
+        {/* Modal Quyền riêng tư */}
+        <Modal
+          open={showPrivacyModal}
+          title={
+            <span
+              style={{ fontSize: "20px", fontWeight: 800, color: "#9333ea" }}
+            >
+              {t.privacyTitle}
+            </span>
+          }
+          closable={false}
+          className="privacy-modal"
+          maskClosable={false}
+          centered
+          footer={[
+            <Button key="decline" shape="round" onClick={handleDeclinePrivacy}>
+              {t.declineBtn}
+            </Button>,
+            <Button
+              key="accept"
+              type="primary"
+              shape="round"
+              onClick={handleAcceptPrivacy}
+            >
+              {t.acceptBtn}
+            </Button>,
+          ]}
+        >
+          <Typography.Paragraph
+            style={{ fontSize: "15px", color: "#4b5563", marginTop: "16px" }}
+          >
+            {t.privacyDesc}
+          </Typography.Paragraph>
         </Modal>
       </div>
     </ConfigProvider>
