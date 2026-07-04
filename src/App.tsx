@@ -357,7 +357,7 @@ const App: React.FC = () => {
                       alt="Vietnam Flag"
                       className="flag-icon"
                     />
-                    <span className="lang-text">VN</span>
+                    <span className="lang-text">Tiếng Việt</span>
                   </button>
                   <button
                     className={`lang-btn ${lang === "en" ? "active" : ""}`}
@@ -368,7 +368,7 @@ const App: React.FC = () => {
                       alt="UK Flag"
                       className="flag-icon"
                     />
-                    <span className="lang-text">EN</span>
+                    <span className="lang-text">English</span>
                   </button>
                 </div>
               </div>
