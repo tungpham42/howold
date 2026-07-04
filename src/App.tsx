@@ -53,8 +53,21 @@ const translations = {
       "Không thể tải các mô hình nhận diện. Đảm bảo chúng ở trong thư mục public/models.",
     guessingText: "Đang đoán tuổi...",
     privacyTitle: "Quyền riêng tư & Dữ liệu",
-    privacyDesc:
-      "Ứng dụng này cần sử dụng camera hoặc ảnh tải lên của bạn để phân tích khuôn mặt. Tất cả quá trình xử lý (AI) đều diễn ra trực tiếp trên trình duyệt của thiết bị. Chúng tôi KHÔNG lưu trữ, KHÔNG thu thập và KHÔNG gửi bất kỳ hình ảnh nào của bạn lên máy chủ.",
+    privacyDesc: (
+      <>
+        Ứng dụng này cần sử dụng camera hoặc ảnh tải lên của bạn để phân tích
+        khuôn mặt.{" "}
+        <strong>
+          Tất cả quá trình xử lý (AI) đều diễn ra trực tiếp trên trình duyệt của
+          thiết bị.
+        </strong>{" "}
+        Chúng tôi{" "}
+        <strong>
+          KHÔNG lưu trữ, KHÔNG thu thập và KHÔNG gửi bất kỳ hình ảnh nào
+        </strong>{" "}
+        của bạn lên máy chủ.
+      </>
+    ),
     acceptBtn: "Tôi đồng ý",
     declineBtn: "Từ chối",
     privacyRequired:
@@ -86,8 +99,17 @@ const translations = {
       "Failed to load detection models. Ensure they are in the public/models directory.",
     guessingText: "Guessing age...",
     privacyTitle: "Data & Privacy Policy",
-    privacyDesc:
-      "This app requires access to your camera or uploaded photos for facial analysis. All AI processing happens locally on your device's browser. We DO NOT store, collect, or send any of your images to any servers.",
+    privacyDesc: (
+      <>
+        This app requires access to your camera or uploaded photos for facial
+        analysis.{" "}
+        <strong>
+          All AI processing happens locally on your device's browser.
+        </strong>{" "}
+        We <strong>DO NOT store, collect, or send any of your images</strong> to
+        any servers.
+      </>
+    ),
     acceptBtn: "I Accept",
     declineBtn: "Decline",
     privacyRequired: "You must accept the privacy policy to use this app.",
