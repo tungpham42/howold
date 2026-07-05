@@ -15,7 +15,6 @@ import {
 import {
   UploadOutlined,
   CameraOutlined,
-  ScanOutlined,
   LoadingOutlined,
 } from "@ant-design/icons";
 import type { UploadProps } from "antd";
@@ -36,8 +35,6 @@ const translations = {
     closeCamera: "Đóng Camera",
     clearBtn: "Xóa ảnh / Tắt Camera",
     awaiting: "Nhấn vào đây để tải ảnh hoặc mở camera",
-    analyzeBtn: "Đoán tuổi",
-    analyzingBtn: "Đang phân tích...",
     modalTitle: "Phân tích hoàn tất",
     modalResult: "Bạn trông",
     modalSuffix: "tuổi",
@@ -83,8 +80,6 @@ const translations = {
     closeCamera: "Close Camera",
     clearBtn: "Clear Media",
     awaiting: "Click here to upload or open camera",
-    analyzeBtn: "Analyze Age",
-    analyzingBtn: "Analyzing Features...",
     modalTitle: "Analysis Complete",
     modalResult: "You look",
     modalSuffix: "years old",
@@ -134,7 +129,6 @@ const App: React.FC = () => {
   const [showOptions, setShowOptions] = useState<boolean>(false);
   const [hasAnalyzed, setHasAnalyzed] = useState<boolean>(false);
 
-  // --- NEW: State cho Privacy Modal ---
   const [showPrivacyModal, setShowPrivacyModal] = useState<boolean>(() => {
     return sessionStorage.getItem("privacyAccepted") !== "true";
   });
@@ -236,6 +230,7 @@ const App: React.FC = () => {
     stopCamera();
     setHasAnalyzed(false);
     setShowOptions(false);
+    setAnalyzing(false);
   };
 
   // --- TTS Implementation ---
@@ -250,7 +245,6 @@ const App: React.FC = () => {
       const data = await response.json();
 
       if (data.audioContent) {
-        // Use HTML Audio constructor to play back the base64 content
         const audio = new Audio(data.audioContent);
         await audio.play();
       }
@@ -259,55 +253,111 @@ const App: React.FC = () => {
     }
   };
 
-  const detectAge = async () => {
-    if (!modelsLoaded) {
-      message.warning(t.errLoadModels);
-      return;
-    }
+  // --- Auto-detect for Uploaded Images ---
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
 
-    setAnalyzing(true);
-    setDetectedAge(null);
-
-    try {
-      let input: HTMLImageElement | HTMLVideoElement | null = null;
-
-      if (isCameraActive && videoRef.current) {
-        input = videoRef.current;
-      } else if (imageUrl && imageRef.current) {
-        input = imageRef.current;
-      }
-
-      if (!input) {
-        message.warning(t.errNoInput);
+    const processImage = async () => {
+      if (!imageRef.current || !imageUrl || hasAnalyzed || !modelsLoaded) {
         setAnalyzing(false);
-        clearMedia();
         return;
       }
 
-      const [detection] = await Promise.all([
-        faceapi
-          .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions())
-          .withAgeAndGender(),
-        new Promise((resolve) => setTimeout(resolve, 2500)),
-      ]);
+      try {
+        const detection = await faceapi
+          .detectSingleFace(
+            imageRef.current,
+            new faceapi.TinyFaceDetectorOptions(),
+          )
+          .withAgeAndGender();
 
-      if (detection) {
-        const roundedAge = Math.round(detection.age);
-        setDetectedAge(roundedAge);
-        setIsModalOpen(true);
-        setHasAnalyzed(true);
-        speakResult(roundedAge);
-      } else {
-        message.warning(t.errNoFace);
-        clearMedia();
+        if (detection) {
+          const roundedAge = Math.round(detection.age);
+          setDetectedAge(roundedAge);
+          setIsModalOpen(true);
+          setHasAnalyzed(true);
+          speakResult(roundedAge);
+        } else {
+          message.warning(t.errNoFace);
+          clearMedia();
+        }
+      } catch (error) {
+        message.error(t.errAnalyze);
+        console.error(error);
+      } finally {
+        setAnalyzing(false);
       }
-    } catch (error) {
-      message.error(t.errAnalyze);
-      console.error(error);
-    } finally {
-      setAnalyzing(false);
+    };
+
+    if (imageUrl && !hasAnalyzed && modelsLoaded) {
+      // Trigger the waiting spinner immediately
+      setAnalyzing(true);
+      // Wait 2 seconds before guessing
+      timeoutId = setTimeout(processImage, 2000);
     }
-  };
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageUrl, hasAnalyzed, modelsLoaded, lang]);
+
+  // --- Auto-detect for Live Camera Feed ---
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    let timeoutId: NodeJS.Timeout;
+
+    const processVideo = async () => {
+      if (
+        !videoRef.current ||
+        !isCameraActive ||
+        hasAnalyzed ||
+        !modelsLoaded ||
+        videoRef.current.readyState < 2
+      ) {
+        return;
+      }
+
+      try {
+        const detection = await faceapi
+          .detectSingleFace(
+            videoRef.current,
+            new faceapi.TinyFaceDetectorOptions(),
+          )
+          .withAgeAndGender();
+
+        if (detection) {
+          const roundedAge = Math.round(detection.age);
+          setDetectedAge(roundedAge);
+
+          // Stop the spinner only when a face is successfully found
+          setAnalyzing(false);
+
+          setIsModalOpen(true);
+          setHasAnalyzed(true);
+          speakResult(roundedAge);
+        }
+      } catch (error) {
+        console.error("Camera auto-detect error:", error);
+      }
+    };
+
+    if (isCameraActive && !hasAnalyzed && modelsLoaded) {
+      // Trigger the waiting spinner immediately
+      setAnalyzing(true);
+
+      // Wait 2 seconds, then start polling (while keeping the spinner active)
+      timeoutId = setTimeout(() => {
+        intervalId = setInterval(processVideo, 800);
+      }, 2000);
+    }
+
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(intervalId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCameraActive, hasAnalyzed, modelsLoaded, lang]);
 
   const closeResultModal = () => {
     setIsModalOpen(false);
@@ -419,7 +469,6 @@ const App: React.FC = () => {
                             : "default",
                       }}
                     >
-                      {/* Video tag optimized for Mobile/iOS */}
                       {isCameraActive && (
                         <video
                           ref={videoRef}
@@ -511,33 +560,12 @@ const App: React.FC = () => {
                       )}
                     </div>
                   </Spin>
-
-                  <Row justify="center">
-                    <Button
-                      type="primary"
-                      size="large"
-                      shape="round"
-                      icon={<ScanOutlined />}
-                      onClick={detectAge}
-                      loading={analyzing}
-                      disabled={!imageUrl && !isCameraActive}
-                      style={{
-                        width: "100%",
-                        maxWidth: 320,
-                        height: 56,
-                        fontSize: 18,
-                      }}
-                    >
-                      {analyzing ? t.analyzingBtn : t.analyzeBtn}
-                    </Button>
-                  </Row>
                 </Space>
               )}
             </Card>
           </Col>
         </Row>
 
-        {/* Modal Kết quả */}
         <Modal
           open={isModalOpen}
           onCancel={closeResultModal}
@@ -567,7 +595,6 @@ const App: React.FC = () => {
           </div>
         </Modal>
 
-        {/* Modal Quyền riêng tư */}
         <Modal
           open={showPrivacyModal}
           title={
